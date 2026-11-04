@@ -1,16 +1,9 @@
-
-# Name your project! Project names should contain only lowercase characters
-# and underscores. A good package name should reflect your organization's
-# name or the intended use of these models
 name: 'my_dbt_snowflake'
-version: '1.0.0'
-
-# This setting configures which "profile" dbt uses for this project.
+version: '1.1.0'
+config-version: 2
 profile: 'dbt_profile'
+require-dbt-version: ">=1.8.0,<1.9.0"
 
-# These configurations specify where dbt should look for different types of files.
-# The `model-paths` config, for example, states that models in this project can be
-# found in the "models/" directory. You probably won't need to change these!
 model-paths: ["models"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]
@@ -18,19 +11,50 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-clean-targets:         # directories to be removed by `dbt clean`
-  - "target"
-  - "dbt_packages"
+clean-targets: ["target", "dbt_packages"]
 
+vars:
+  # Claim banding thresholds - change here, not in SQL
+  claim_low_max: 1000
+  claim_medium_max: 5000
 
-# Configuring models
-# Full documentation: https://docs.getdbt.com/docs/configuring-models
-
-# In this example config, we tell dbt to build all models in the example/
-# directory as views. These settings can be overridden in the individual model
-# files using the `{{ config(...) }}` macro.
+# Model layers: staging (1:1 clean) -> intermediate (business logic) -> marts (consumption)
 models:
   my_dbt_snowflake:
-    # Config indicated by + and applies to all files under models/example/
-    example:
+    +on_schema_change: append_new_columns
+    staging:
+      +materialized: view
+      +schema: staging
+      +tags: ['staging']
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+      +tags: ['intermediate']
+    marts:
       +materialized: table
+      +schema: marts
+      +tags: ['marts']
+
+# Seeds are synthetic data for dev/CI only. In prod, RAW is loaded by the ingestion pipeline.
+seeds:
+  my_dbt_snowflake:
+    +schema: raw
+    raw_claims:
+      +enabled: "{{ target.name != 'prod' }}"
+      +column_types:
+        claim_amount: number(18,2)
+        claim_date: date
+        loaded_at: timestamp_ntz
+    raw_patients:
+      +enabled: "{{ target.name != 'prod' }}"
+      +column_types:
+        date_of_birth: date
+        loaded_at: timestamp_ntz
+    legacy_claims_extract:
+      +schema: migration
+      +column_types:
+        claim_amount: number(18,2)
+        claim_date: date
+
+data_tests:
+  +store_failures: false

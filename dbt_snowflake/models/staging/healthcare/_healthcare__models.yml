@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: stg_healthcare__claims
+    description: Cleaned 1:1 view over raw claims. Invalid rows are kept and handled downstream.
+    columns:
+      - name: claim_id
+        description: Business key of the claim.
+        data_tests:
+          - unique
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: "^CLM-[0-9]{4,}$"
+      - name: patient_id
+        data_tests:
+          - not_null
+      - name: claim_amount
+        description: Claim value in AUD. NULL means the source did not supply it (see claims_rejected).
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: claim_date
+        data_tests:
+          - not_null
+          - not_in_future
+      - name: loaded_at
+        data_tests:
+          - not_null
+
+  - name: stg_healthcare__patients
+    description: Cleaned 1:1 view over raw patients.
+    columns:
+      - name: patient_id
+        data_tests:
+          - unique
+          - not_null
+      - name: date_of_birth
+        description: Patient date of birth.
+        meta:
+          contains_pii: true
+        data_tests:
+          - not_in_future
+      - name: gender
+        data_tests:
+          - accepted_values:
+              values: ['F', 'M', 'X']

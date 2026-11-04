@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: int_claims__enriched
+    description: Claims with banding and a validity flag. Feeds fct_claims and claims_rejected.
+    columns:
+      - name: claim_id
+        data_tests: [unique, not_null]
+      - name: claim_category
+        data_tests:
+          - accepted_values:
+              values: ['Low', 'Medium', 'High']
+
+# Unit tests: mocked inputs, no warehouse data needed. Boundary values are the point.
+unit_tests:
+  - name: test_claim_category_boundaries
+    model: int_claims__enriched
+    given:
+      - input: ref('stg_healthcare__claims')
+        rows:
+          - {claim_id: 'CLM-1', patient_id: 'P1', claim_amount: 999.99,  claim_date: '2024-01-01', loaded_at: '2024-01-02 00:00:00'}
+          - {claim_id: 'CLM-2', patient_id: 'P1', claim_amount: 1000,    claim_date: '2024-01-01', loaded_at: '2024-01-02 00:00:00'}
+          - {claim_id: 'CLM-3', patient_id: 'P1', claim_amount: 5000,    claim_date: '2024-01-01', loaded_at: '2024-01-02 00:00:00'}
+          - {claim_id: 'CLM-4', patient_id: 'P1', claim_amount: 5000.01, claim_date: '2024-01-01', loaded_at: '2024-01-02 00:00:00'}
+    expect:
+      rows:
+        - {claim_id: 'CLM-1', claim_category: 'Low'}
+        - {claim_id: 'CLM-2', claim_category: 'Medium'}
+        - {claim_id: 'CLM-3', claim_category: 'Medium'}
+        - {claim_id: 'CLM-4', claim_category: 'High'}
+
+  - name: test_null_amount_is_invalid_not_high
+    model: int_claims__enriched
+    given:
+      - input: ref('stg_healthcare__claims')
+        rows:
+          - {claim_id: 'CLM-9', patient_id: 'P1', claim_amount: null, claim_date: '2024-01-01', loaded_at: '2024-01-02 00:00:00'}
+    expect:
+      rows:
+        - {claim_id: 'CLM-9', claim_category: null, is_valid_claim: false}

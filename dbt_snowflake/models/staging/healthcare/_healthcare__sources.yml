@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: healthcare
+    description: Raw healthcare claims landed by the ingestion pipeline (seeds in dev/ci).
+    database: "{{ target.database }}"
+    # Mirrors generate_schema_name: RAW in prod, <dev/ci schema>_raw elsewhere (where seeds land).
+    schema: "{{ 'raw' if target.name == 'prod' else target.schema ~ '_raw' }}"
+    tables:
+      - name: raw_claims
+        description: One row per claim as received. No cleansing applied.
+        loaded_at_field: loaded_at
+        freshness:
+          warn_after: {count: 36, period: hour}
+          error_after: {count: 72, period: hour}
+        # Freshness is only meaningful against live feeds; the dev/ci seed is static.
+      - name: raw_patients
+        description: One row per patient as received.
+        loaded_at_field: loaded_at

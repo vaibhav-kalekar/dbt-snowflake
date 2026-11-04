@@ -1,4 +1,10 @@
-
 target/
 dbt_packages/
 logs/
+.env
+profiles.yml
+*.p8
+*.pem
+.venv/
+__pycache__/
+.user.yml

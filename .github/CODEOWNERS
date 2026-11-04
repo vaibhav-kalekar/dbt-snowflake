@@ -1,0 +1,5 @@
+# Platform standards changes need an explicit review.
+/dbt_snowflake/dbt_project.yml   @vaibhav-kalekar
+/dbt_snowflake/macros/           @vaibhav-kalekar
+/.github/                        @vaibhav-kalekar
+*                                @vaibhav-kalekar

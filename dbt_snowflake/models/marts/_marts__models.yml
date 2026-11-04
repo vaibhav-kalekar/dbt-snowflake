@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: fct_claims
+    description: >
+      Grain: one row per valid claim. Incremental (merge on claim_id) with a 3-day lookback
+      for late-arriving data. Invalid claims are in claims_rejected.
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: claim_id
+        data_type: varchar
+        data_tests: [unique, not_null]
+      - name: patient_id
+        data_type: varchar
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_patient')
+              field: patient_id
+      - name: claim_amount
+        data_type: number(18,2)
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: claim_date
+        data_type: date
+        data_tests: [not_null, not_in_future]
+      - name: claim_year
+        data_type: integer
+      - name: claim_category
+        data_type: varchar
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Low', 'Medium', 'High']
+      - name: loaded_at
+        data_type: timestamp_ntz
+
+  - name: claims_rejected
+    description: Quarantine of claims that failed validity rules, with a rejection reason.
+    columns:
+      - name: claim_id
+        data_tests: [unique, not_null]
+      - name: rejection_reason
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['missing_claim_amount', 'missing_claim_date']
+
+  - name: dim_patient
+    description: Patient dimension, SCD Type 2 (history from snap_patients).
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: patient_key
+        data_type: varchar
+        data_tests: [unique, not_null]
+      - name: patient_id
+        data_type: varchar
+        data_tests: [not_null]
+      - name: date_of_birth
+        data_type: date
+        meta:
+          contains_pii: true
+      - name: gender
+        data_type: varchar
+      - name: state
+        data_type: varchar
+      - name: valid_from
+        data_type: timestamp_ntz
+      - name: valid_to
+        data_type: timestamp_ntz
+      - name: is_current
+        data_type: boolean
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [patient_id, valid_from]
